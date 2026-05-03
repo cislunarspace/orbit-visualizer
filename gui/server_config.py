@@ -1,5 +1,7 @@
 from PyQt6.QtWidgets import QFormLayout, QGroupBox, QLineEdit, QSpinBox, QVBoxLayout, QWidget
 
+from src.orbit.request import ServerEndpoint
+
 
 class ServerConfig(QWidget):
     """Host and port configuration for the FastAPI server."""
@@ -27,7 +29,12 @@ class ServerConfig(QWidget):
 
     def get_config(self) -> dict:
         """Return {host: str, port: int}."""
+        endpoint = self.get_endpoint()
         return {
-            "host": self._host.text(),
-            "port": self._port.value(),
+            "host": endpoint.host,
+            "port": endpoint.port,
         }
+
+    def get_endpoint(self) -> ServerEndpoint:
+        """Return the local API server endpoint."""
+        return ServerEndpoint(host=self._host.text(), port=self._port.value())

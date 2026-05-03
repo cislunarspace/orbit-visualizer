@@ -12,6 +12,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.orbit.request import OrbitRequest
+from src.satellites import Satellite
+
 
 class OrbitConfig(QWidget):
     """Orbit type checkboxes and global orbit parameters."""
@@ -73,6 +76,17 @@ class OrbitConfig(QWidget):
 
     def get_config(self) -> dict:
         """Return current orbit configuration."""
+        request = self.get_orbit_request()
+        return {
+            "types": list(request.types),
+            "hours": request.hours,
+            "step": request.step,
+            "base_time": request.base_time,
+            "r0": request.radius_m,
+        }
+
+    def get_orbit_request(self, satellite: Satellite | None = None) -> OrbitRequest:
+        """Return current orbit configuration as a domain request."""
         types = []
         if self._cb_state_vector.isChecked():
             types.append("state_vector")
@@ -82,14 +96,16 @@ class OrbitConfig(QWidget):
             types.append("broadcast")
         if self._cb_precise.isChecked():
             types.append("precise")
-        return {
-            "types": types,
-            "hours": self._hours.value(),
-            "step": self._step.value(),
-            "base_time": (
-                self._base_time.dateTime().toPyDateTime().astimezone(timezone.utc)
-                if self._base_time.dateTime().toPyDateTime().tzinfo is not None
-                else self._base_time.dateTime().toPyDateTime().replace(tzinfo=timezone.utc)
-            ),
-            "r0": self._r0.value(),
-        }
+        base_time = (
+            self._base_time.dateTime().toPyDateTime().astimezone(timezone.utc)
+            if self._base_time.dateTime().toPyDateTime().tzinfo is not None
+            else self._base_time.dateTime().toPyDateTime().replace(tzinfo=timezone.utc)
+        )
+        return OrbitRequest(
+            types=tuple(types),  # type: ignore[arg-type]
+            hours=self._hours.value(),
+            step=self._step.value(),
+            base_time=base_time,
+            radius_m=self._r0.value(),
+            satellite=satellite,
+        )

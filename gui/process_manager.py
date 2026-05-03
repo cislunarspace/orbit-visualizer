@@ -1,13 +1,14 @@
-import subprocess
+﻿import subprocess
 import threading
-from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
+
+from gui.server_session import ServerSession
 
 
 class ProcessManager(QObject):
     """
-    Manages the FastAPI/uvicorn server subprocess lifecycle.
+    Qt adapter for the FastAPI/uvicorn server subprocess lifecycle.
 
     Signals:
         started(str):  Emitted with the server URL when server is ready.
@@ -23,58 +24,38 @@ class ProcessManager(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self._process: Optional[subprocess.Popen] = None
-        self._reader_thread: Optional[threading.Thread] = None
-        self._host: str = ""
-        self._port: int = 0
-        self._stopped_by_user: bool = False
-        self._reader_ready: bool = False
+        self._session = ServerSession()
+        self._reader_thread: threading.Thread | None = None
 
     def start(self, host: str, port: int) -> None:
         if self.is_running():
             return
-        self._stopped_by_user = False
-        self._host = host
-        self._port = port
-        self._process = subprocess.Popen(
-            ["uvicorn", "main:app", "--host", host, "--port", str(port)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
+        self._session.start(host, port)
         self._reader_thread = threading.Thread(target=self._read_output, daemon=True)
         self._reader_thread.start()
 
     def stop(self) -> None:
         if not self.is_running():
             return
-        self._stopped_by_user = True
-        assert self._process is not None
-        self._process.terminate()
-        self._process.wait()
+        self._session.stop()
         if self._reader_thread is not None:
             self._reader_thread.join(timeout=5)
-        self._process = None
         self._reader_thread = None
         self.stopped.emit()
 
     def is_running(self) -> bool:
-        if self._process is None:
-            return False
-        return self._process.poll() is None
+        return self._session.is_running()
 
     def _read_output(self) -> None:
-        process = self._process
-        if process is None:
+        process = self._session.process
+        if process is None or process.stdout is None:
             return
         for raw_line in process.stdout:
             line = raw_line.rstrip("\n\r")
             self.output.emit(line)
-            if "Uvicorn running on" in line or "Uvicorn running" in line:
-                self.started.emit(f"http://{self._host}:{self._port}")
-        # Thread finished — check if unexpected exit
-        if not self._stopped_by_user:
-            code = process.poll()
-            if code is not None:
-                self.failed.emit(f"Server exited unexpectedly with code {code}")
+            event = self._session.handle_output_line(line)
+            if event.kind == "started":
+                self.started.emit(event.message)
+        event = self._session.finish_event()
+        if event is not None and event.kind == "failed":
+            self.failed.emit(event.message)
