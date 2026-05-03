@@ -158,18 +158,28 @@ def orbit_precise() -> list[dict]:
 
 
 @app.get("/api/all")
-def all_orbits() -> list[dict]:
+def all_orbits(types: str | None = None) -> list[dict]:
     t0 = datetime.now(timezone.utc)
     sat = get_default_satellite()
-    sv = generate_state_vector_orbit(base_time=t0)
-    tle = tle_to_orbit(sat.tle_line1, sat.tle_line2, base_time=t0)
-    brd = generate_broadcast_ephemeris(base_time=t0)
-    pre = generate_precise_ephemeris(base_time=t0)
 
-    czml = [
-        make_czml("状态向量", sv, [0, 255, 255, 180])[1],
-        make_czml("TLE", tle, [255, 255, 0, 180])[1],
-        make_czml("广播星历", brd, [0, 255, 0, 180])[1],
-        make_czml("精密星历", pre, [255, 0, 0, 180])[1],
-    ]
+    requested = set(types.split(",")) if types else None
+
+    czml: list[dict] = []
+
+    if requested is None or "state_vector" in requested:
+        sv = generate_state_vector_orbit(base_time=t0)
+        czml.append(make_czml("状态向量", sv, [0, 255, 255, 180])[1])
+
+    if requested is None or "tle" in requested:
+        tle = tle_to_orbit(sat.tle_line1, sat.tle_line2, base_time=t0)
+        czml.append(make_czml("TLE", tle, [255, 255, 0, 180])[1])
+
+    if requested is None or "broadcast" in requested:
+        brd = generate_broadcast_ephemeris(base_time=t0)
+        czml.append(make_czml("广播星历", brd, [0, 255, 0, 180])[1])
+
+    if requested is None or "precise" in requested:
+        pre = generate_precise_ephemeris(base_time=t0)
+        czml.append(make_czml("精密星历", pre, [255, 0, 0, 180])[1])
+
     return [{"id": "document", "version": "1.0"}, *czml]

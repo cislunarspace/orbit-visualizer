@@ -1,2 +1,2 @@
 uv sync
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run python -m gui
