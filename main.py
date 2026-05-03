@@ -6,6 +6,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sgp4.api import Satrec, jday
 
+from src.orbit import (
+    EARTH_GRAVITATIONAL_PARAMETER,
+    GPS_SEMI_MAJOR_AXIS_M,
+    LEO_ORBITAL_RADIUS_M,
+    PRECISE_SEMI_MAJOR_AXIS_M,
+)
+from src.satellites import get_default_satellite
+
+
 def _utc_str(dt: datetime) -> str:
     """Format a timezone-aware UTC datetime as ISO 8601 with Z suffix."""
     return dt.isoformat().replace("+00:00", "Z")
@@ -19,8 +28,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def generate_state_vector_orbit(hours: int = 24, step: int = 60, base_time: datetime | None = None) -> list[dict]:
     """仿真状态向量轨道：近地卫星（ECI 坐标系）"""
     t0 = base_time or datetime.now(timezone.utc)
-    mu = 398600.4418e9  # 地球引力常数 m³/s²
-    r0 = 7000e3  # 初始轨道半径 m
+    mu = EARTH_GRAVITATIONAL_PARAMETER
+    r0 = LEO_ORBITAL_RADIUS_M
 
     pos_list = []
     for i in range(0, hours * 3600, step):
@@ -52,7 +61,7 @@ def tle_to_orbit(tle_line1: str, tle_line2: str, hours: int = 24, step: int = 60
 def generate_broadcast_ephemeris(hours: int = 24, step: int = 60, base_time: datetime | None = None) -> list[dict]:
     """模拟 GPS 导航卫星广播星历（MEO 轨道）"""
     t0 = base_time or datetime.now(timezone.utc)
-    a = 26560e3  # GPS 轨道半长轴 m
+    a = GPS_SEMI_MAJOR_AXIS_M
     data = []
 
     for i in range(0, hours * 3600, step):
@@ -69,7 +78,7 @@ def generate_broadcast_ephemeris(hours: int = 24, step: int = 60, base_time: dat
 def generate_precise_ephemeris(hours: int = 24, step: int = 60, base_time: datetime | None = None) -> list[dict]:
     """模拟 SP3 格式科学级精密星历"""
     t0 = base_time or datetime.now(timezone.utc)
-    a = 26600e3  # 轨道半长轴 m
+    a = PRECISE_SEMI_MAJOR_AXIS_M
     data = []
 
     for i in range(0, hours * 3600, step):
@@ -117,9 +126,6 @@ def make_czml(name: str, data: list[dict], color: list[int]) -> list[dict]:
 
 # ---- API 接口 ----
 
-ISS_TLE1 = "1 25544U 98067A   25123.56789017  .00000012  00000-0  12345-6 0  1234"
-ISS_TLE2 = "2 25544  51.6400  10.0000 0001234  10.0000  350.0000 15.48999999123456"
-
 
 @app.get("/")
 def index() -> FileResponse:
@@ -134,7 +140,8 @@ def orbit_state_vector() -> list[dict]:
 
 @app.get("/api/orbit/tle")
 def orbit_tle() -> list[dict]:
-    data = tle_to_orbit(ISS_TLE1, ISS_TLE2)
+    sat = get_default_satellite()
+    data = tle_to_orbit(sat.tle_line1, sat.tle_line2)
     return make_czml("TLE(低轨预报)", data, [255, 255, 0, 180])
 
 
@@ -153,8 +160,9 @@ def orbit_precise() -> list[dict]:
 @app.get("/api/all")
 def all_orbits() -> list[dict]:
     t0 = datetime.now(timezone.utc)
+    sat = get_default_satellite()
     sv = generate_state_vector_orbit(base_time=t0)
-    tle = tle_to_orbit(ISS_TLE1, ISS_TLE2, base_time=t0)
+    tle = tle_to_orbit(sat.tle_line1, sat.tle_line2, base_time=t0)
     brd = generate_broadcast_ephemeris(base_time=t0)
     pre = generate_precise_ephemeris(base_time=t0)
 
