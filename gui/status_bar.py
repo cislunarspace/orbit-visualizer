@@ -1,12 +1,12 @@
 from typing import Literal
 
 from PyQt6.QtCore import QUrl
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QStatusBar
 
 from PyQt6.QtGui import QDesktopServices
 
 
-class StatusBar(QWidget):
+class StatusBar(QStatusBar):
     """
     Displays server status and an optional browser hyperlink.
 
@@ -19,18 +19,14 @@ class StatusBar(QWidget):
 
     def __init__(self) -> None:
         super().__init__()
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-
         self._label = QLabel("状态: 已停止")
         self._link = QPushButton("打开浏览器 →")
         self._link.setVisible(False)
         self._link.clicked.connect(self._open_browser)
         self._current_url: str = ""
 
-        layout.addWidget(self._label)
-        layout.addStretch()
-        layout.addWidget(self._link)
+        self.addWidget(self._label)
+        self.addPermanentWidget(self._link)
 
     def set_status(self, state: Literal["stopped", "starting", "running", "failed"], url: str = "") -> None:
         """Update the status label and optionally show the browser link."""

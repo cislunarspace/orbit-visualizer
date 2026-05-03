@@ -1,6 +1,9 @@
 from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
     QApplication,
+    QLabel,
+    QMainWindow,
+    QMenuBar,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -8,6 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from gui.help_dialog import HelpDialog
 from gui.orbit_config import OrbitConfig
 from gui.process_manager import ProcessManager
 from gui.server_config import ServerConfig
@@ -15,7 +19,7 @@ from gui.status_bar import StatusBar
 from gui.tle_input import TLEInput
 
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     """Main application window composing all config widgets and server lifecycle."""
 
     def __init__(self) -> None:
@@ -27,6 +31,13 @@ class MainWindow(QWidget):
         self._process_manager.stopped.connect(self._on_server_stopped)
         self._server_running = False
 
+        # Menu bar
+        menu_bar = QMenuBar()
+        help_menu = menu_bar.addMenu("帮助 / Help")
+        help_action = help_menu.addAction("用户手册 / User Manual")
+        help_action.triggered.connect(self._on_help)
+        self.setMenuBar(menu_bar)
+
         # Main scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -34,8 +45,6 @@ class MainWindow(QWidget):
         content_layout = QVBoxLayout(content)
 
         # Title label
-        from PyQt6.QtWidgets import QLabel
-
         title = QLabel("卫星轨道可视化器")
         title.setStyleSheet("font-size: 18px; font-weight: bold;")
         content_layout.addWidget(title)
@@ -57,16 +66,19 @@ class MainWindow(QWidget):
         self._start_stop_btn.clicked.connect(self._on_start_stop_clicked)
         content_layout.addWidget(self._start_stop_btn)
 
+        # Help button
+        self._help_btn = QPushButton("帮助 / Help")
+        self._help_btn.clicked.connect(self._on_help)
+        content_layout.addWidget(self._help_btn)
+
         content_layout.addStretch()
         scroll.setWidget(content)
 
+        self.setCentralWidget(scroll)
+
         # Status bar at bottom
         self._status_bar = StatusBar()
-
-        # Overall layout
-        outer = QVBoxLayout(self)
-        outer.addWidget(scroll, stretch=1)
-        outer.addWidget(self._status_bar)
+        self.setStatusBar(self._status_bar)
 
     def _on_start_stop_clicked(self) -> None:
         if self._server_running:
@@ -107,3 +119,7 @@ class MainWindow(QWidget):
         if self._process_manager.is_running():
             self._stop_server()
         event.accept()
+
+    def _on_help(self) -> None:
+        dialog = HelpDialog(self)
+        dialog.exec()
